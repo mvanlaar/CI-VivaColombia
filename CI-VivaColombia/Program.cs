@@ -1,8 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using CsvHelper;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -13,6 +16,8 @@ namespace CI_VivaColombia
 {
     class Program
     {
+        public static readonly List<int> _AddDays = new List<int>() { 0,7,14,21,28,35,42,49,56,63,70,77,84 };
+
         static void Main(string[] args)
         {                       
             string dataDir = AppDomain.CurrentDomain.BaseDirectory + "\\data";
@@ -21,7 +26,18 @@ namespace CI_VivaColombia
             Uri url = new Uri("https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios");
             const string ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)";
             const string referer = "https://www.vivacolombia.co/";
-            CultureInfo ci = new CultureInfo("es-ES");
+            CultureInfo ci = new CultureInfo("es-CO");
+            DateTimeFormatInfo dtfi = ci.DateTimeFormat;
+
+            //custom month names ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic
+            dtfi.AbbreviatedMonthNames = new string[] { "ene", "feb", "mar",
+                                                  "abr", "may", "jun",
+                                                  "jul", "ago", "sep",
+                                                  "oct", "nov", "dic", "" };
+            dtfi.AbbreviatedMonthGenitiveNames = dtfi.AbbreviatedMonthNames;
+
+
+
 
             string TEMP_FromIATA = null;
             string TEMP_ToIATA = null;
@@ -39,8 +55,7 @@ namespace CI_VivaColombia
             DateTime TEMP_ArrivalTime = new DateTime();
             Boolean TEMP_FlightCodeShare = false;
             string TEMP_FlightNumber = null;
-            string TEMP_Aircraftcode = null;
-            TimeSpan TEMP_DurationTime = TimeSpan.MinValue;
+            string TEMP_Aircraftcode = null;            
             Boolean TEMP_FlightNextDayArrival = false;
             int TEMP_FlightNextDays = 0;
             List<CIFLight> CIFLights = new List<CIFLight> { };
@@ -74,83 +89,428 @@ namespace CI_VivaColombia
                 foreach (var to in from.Connections)
                 {
                     Console.WriteLine("Getting flight: {0} - {1}", from.Name, to.Name);
-                    var baseAddress = "https://www.vivacolombia.co/FlightSchedulePart/Search";
-                    const string referersearch = "https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios";
-                    var http = (HttpWebRequest)WebRequest.Create(new Uri(baseAddress));
-                    http.Accept = "application/json";
-                    http.ContentType = "application/json";
-                    http.Method = "POST";
-                    http.Referer = referersearch;
-                    http.UserAgent = ua;
-                    DateTime dt = DateTime.Now;
-                    // Build Json Request.
-                    var flight = new { from = from.Code.ToString(), to = to.Code.ToString(), outbound = dt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), inbound = dt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), isRoundTrip = false, fromName = from.Name.ToString(), toName = to.Name.ToString() };
-                    string parsedContent = JsonConvert.SerializeObject(flight);
-                    ASCIIEncoding encoding = new ASCIIEncoding();
-                    Byte[] bytes = encoding.GetBytes(parsedContent);
-
-                    Stream newStream = http.GetRequestStream();
-                    newStream.Write(bytes, 0, bytes.Length);
-                    newStream.Close();
-                    var response = http.GetResponse();
-                    var stream = response.GetResponseStream();
-                    var sr = new StreamReader(stream);
-                    var flightresponse = sr.ReadToEnd();
                     
-                    // Parse the Response.
-                    dynamic FlightResponseJson = JsonConvert.DeserializeObject(flightresponse);
-                    string FlightWeek = FlightResponseJson.OutboundHeader;
-                    // Cleaning TEMP variable
-                    TEMP_FromIATA = from.Code.ToString();
-                    TEMP_ToIATA = to.Code.ToString();
-                    // Cleaning All but From and To 
-                    TEMP_ValidFrom = new DateTime();
-                    TEMP_ValidTo = new DateTime();
-                    TEMP_Conversie = 0;
-                    TEMP_FlightMonday = false;
-                    TEMP_FlightTuesday = false;
-                    TEMP_FlightWednesday = false;
-                    TEMP_FlightThursday = false;
-                    TEMP_FlightFriday = false;
-                    TEMP_FlightSaterday = false;
-                    TEMP_FlightSunday = false;
-                    TEMP_DepartTime = new DateTime();
-                    TEMP_ArrivalTime = new DateTime();
-                    TEMP_FlightNumber = null;
-                    TEMP_Aircraftcode = null;
-                    TEMP_DurationTime = TimeSpan.MinValue;
-                    TEMP_FlightCodeShare = false;
-                    TEMP_FlightNextDayArrival = false;
-                    TEMP_FlightNextDays = 0;
-
-                    // Parsing To and From Date
-                    Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
-                    MatchCollection matches = rgxdate2.Matches(FlightWeek);
-
-                    string validfrom = matches[0].Value;
-                    string validto = matches[1].Value;
                     
-                    DateTime ValidFrom = DateTime.ParseExact(validfrom, "dd MMM yyyy", ci);
-                    DateTime ValidTo = DateTime.ParseExact(validto, "dd MMM yyyy", ci);
-
-
-                    foreach (var Schedules in FlightResponseJson.OutboundSchedeles)
+                    foreach (int Day in _AddDays)
                     {
-                        TEMP_FlightNumber = Schedules.FlightNumber;
-                        TEMP_DepartTime = Schedules.DepartureTime;
-                        TEMP_ArrivalTime = Schedules.ArrivalTime;
-                        if (Schedules.DepartDate == Schedules.ArrivalDate) { TEMP_FlightNextDayArrival = false; TEMP_FlightNextDays = 0; } else { TEMP_FlightNextDayArrival = true; TEMP_FlightNextDays = 1; }
-                        // Query flight days
+                        DateTime dt = DateTime.Now;
+                        dt = dt.AddDays(Day);
+                        // Clean TEMP Variables
+                        TEMP_ValidFrom = new DateTime();
+                        TEMP_ValidTo = new DateTime();
+                        var baseAddress = "https://www.vivacolombia.co/FlightSchedulePart/Search";
+                        const string referersearch = "https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios";
+                        var http = (HttpWebRequest)WebRequest.Create(new Uri(baseAddress));
+                        http.Accept = "application/json";
+                        http.ContentType = "application/json";
+                        http.Method = "POST";
+                        http.Referer = referersearch;
+                        http.UserAgent = ua;
+                        // Build Json Request.
+                        var flight = new { from = from.Code.ToString(), to = to.Code.ToString(), outbound = dt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), inbound = dt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), isRoundTrip = false, fromName = from.Name.ToString(), toName = to.Name.ToString() };
+                        string parsedContent = JsonConvert.SerializeObject(flight);
+                        ASCIIEncoding encoding = new ASCIIEncoding();
+                        Byte[] bytes = encoding.GetBytes(parsedContent);
 
-                        // Add Flight to CIFlights
+                        Stream newStream = http.GetRequestStream();
+                        newStream.Write(bytes, 0, bytes.Length);
+                        newStream.Close();                       
+                        var response = http.GetResponse();
+                        var stream = response.GetResponseStream();
+                        var sr = new StreamReader(stream);
+                        var flightresponse = sr.ReadToEnd();
+
+                        // Parse the Response.
+                        dynamic FlightResponseJson = JsonConvert.DeserializeObject(flightresponse);
+                        string FlightWeek = FlightResponseJson.OutboundHeader;
+                        // Cleaning TEMP variable
+                        TEMP_FromIATA = from.Code.ToString();
+                        TEMP_ToIATA = to.Code.ToString();                        
+
+
+                        // Parsing To and From Date
+                        Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
+                        MatchCollection matches = rgxdate2.Matches(FlightWeek);
+
+                        string validfrom = matches[0].Value;
+                        string validto = matches[1].Value;
+
+                        DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM yyyy", dtfi);
+                        DateTime ValidTo = DateTime.ParseExact(validto, "d MMM yyyy", dtfi);
+
+
+                        foreach (var Schedules in FlightResponseJson.OutboundSchedules)
+                        {
+                            TEMP_FlightNumber = Schedules.FlightNumber;
+                            TEMP_DepartTime = Schedules.DepartureTime;
+                            TEMP_ArrivalTime = Schedules.ArrivalTime;
+                            TEMP_ValidFrom = ValidFrom;
+                            TEMP_ValidTo = ValidTo;
+                            if (Schedules.DepartureDate == Schedules.ArrivalDate)
+                            {
+                                TEMP_FlightNextDayArrival = false;
+                                TEMP_FlightNextDays = 0;
+                            }
+                            else
+                            {
+                                TEMP_FlightNextDayArrival = true;
+                                TEMP_FlightNextDays = 1;
+                            }
+                            // Query flight days
+                            foreach (var Days in Schedules.AvailableDays)
+                            {
+                                int.TryParse(Days.ToString(), out TEMP_Conversie);
+                                if (TEMP_Conversie == 1) { TEMP_FlightMonday = true; }
+                                if (TEMP_Conversie == 2) { TEMP_FlightTuesday = true; }
+                                if (TEMP_Conversie == 3) { TEMP_FlightWednesday = true; }
+                                if (TEMP_Conversie == 4) { TEMP_FlightThursday = true; }
+                                if (TEMP_Conversie == 5) { TEMP_FlightFriday = true; }
+                                if (TEMP_Conversie == 6) { TEMP_FlightSaterday = true; }
+                                if (TEMP_Conversie == 7) { TEMP_FlightSunday = true; }
+                            }
+                            // Add Flight to CIFlights
+                            CIFLights.Add(new CIFLight
+                            {
+                                FromIATA = TEMP_FromIATA,
+                                ToIATA = TEMP_ToIATA,
+                                FromDate = TEMP_ValidFrom,
+                                ToDate = TEMP_ValidTo,
+                                ArrivalTime = TEMP_ArrivalTime,
+                                DepartTime = TEMP_DepartTime,
+                                FlightAircraft = "A320",
+                                FlightAirline = "FC",
+                                FlightMonday = TEMP_FlightMonday,
+                                FlightTuesday = TEMP_FlightTuesday,
+                                FlightWednesday = TEMP_FlightWednesday,
+                                FlightThursday = TEMP_FlightThursday,
+                                FlightFriday = TEMP_FlightFriday,
+                                FlightSaterday = TEMP_FlightSaterday,
+                                FlightSunday = TEMP_FlightSunday,
+                                FlightNumber = TEMP_FlightNumber,
+                                FlightOperator = null,
+                                FlightCodeShare = TEMP_FlightCodeShare,
+                                FlightNextDayArrival = TEMP_FlightNextDayArrival,
+                                FlightNextDays = TEMP_FlightNextDays
+                            });
+                            // Cleaning All but From and To and Valid from and Valid To                        
+                            TEMP_Conversie = 0;
+                            TEMP_FlightMonday = false;
+                            TEMP_FlightTuesday = false;
+                            TEMP_FlightWednesday = false;
+                            TEMP_FlightThursday = false;
+                            TEMP_FlightFriday = false;
+                            TEMP_FlightSaterday = false;
+                            TEMP_FlightSunday = false;
+                            TEMP_DepartTime = new DateTime();
+                            TEMP_ArrivalTime = new DateTime();
+                            TEMP_FlightNumber = null;
+                            TEMP_Aircraftcode = null;
+                            TEMP_FlightCodeShare = false;
+                            TEMP_FlightNextDayArrival = false;
+                            TEMP_FlightNextDays = 0;
+                        }
+                        // End Week parsing.
                     }
-                        Console.ReadLine();
-
+                    //End Parsing Flights
                 }                
-                // Console.ReadLine();
+                // End Parsing Routes
             }
-            //Console.ReadLine();
+            // Export XML
+            // Write the list of objects to a file.
+            System.Xml.Serialization.XmlSerializer writer =
+            new System.Xml.Serialization.XmlSerializer(CIFLights.GetType());
+            string myDir = AppDomain.CurrentDomain.BaseDirectory + "\\output";
+            Directory.CreateDirectory(myDir);
+            StreamWriter file =
+               new System.IO.StreamWriter("output\\output.xml");
 
+            writer.Serialize(file, CIFLights);
+            file.Close();
+
+            // GTFS Support
+
+            string gtfsDir = AppDomain.CurrentDomain.BaseDirectory + "\\gtfs";
+            System.IO.Directory.CreateDirectory(gtfsDir);
+
+            Console.WriteLine("Reading IATA Airports....");
+            string IATAAirportsFile = AppDomain.CurrentDomain.BaseDirectory + "IATAAirports.json";
+            JArray o1 = JArray.Parse(File.ReadAllText(IATAAirportsFile));
+            IList<IATAAirport> TempIATAAirports = o1.ToObject<IList<IATAAirport>>();
+            var IATAAirports = TempIATAAirports as List<IATAAirport>;
+
+            Console.WriteLine("Creating GTFS Files...");
+
+            Console.WriteLine("Creating GTFS File agency.txt...");
+            using (var gtfsagency = new StreamWriter(@"gtfs\\agency.txt"))
+            {
+                var csv = new CsvWriter(gtfsagency);
+                csv.Configuration.Delimiter = ",";
+                csv.Configuration.Encoding = Encoding.UTF8;
+                csv.Configuration.TrimFields = true;
+                // header 
+                csv.WriteField("agency_id");
+                csv.WriteField("agency_name");
+                csv.WriteField("agency_url");
+                csv.WriteField("agency_timezone");
+                csv.WriteField("agency_lang");
+                csv.WriteField("agency_phone");
+                csv.WriteField("agency_fare_url");
+                csv.WriteField("agency_email");
+                csv.NextRecord();
+                csv.WriteField("FC");
+                csv.WriteField("VivaColombia");
+                csv.WriteField("https://www.vivacolombia.co/");
+                csv.WriteField("America/Bogota");
+                csv.WriteField("ES");
+                csv.WriteField("");
+                csv.WriteField("");
+                csv.WriteField("");
+                csv.NextRecord();
+            }
+
+            Console.WriteLine("Creating GTFS File routes.txt ...");
+
+            using (var gtfsroutes = new StreamWriter(@"gtfs\\routes.txt"))
+            {
+                // Route record
+
+
+                var csvroutes = new CsvWriter(gtfsroutes);
+                csvroutes.Configuration.Delimiter = ",";
+                csvroutes.Configuration.Encoding = Encoding.UTF8;
+                csvroutes.Configuration.TrimFields = true;
+                // header 
+                csvroutes.WriteField("route_id");
+                csvroutes.WriteField("agency_id");
+                csvroutes.WriteField("route_short_name");
+                csvroutes.WriteField("route_long_name");
+                csvroutes.WriteField("route_desc");
+                csvroutes.WriteField("route_type");
+                csvroutes.WriteField("route_url");
+                csvroutes.WriteField("route_color");
+                csvroutes.WriteField("route_text_color");
+                csvroutes.NextRecord();
+
+                var routes = CIFLights.Select(m => new { m.FromIATA, m.ToIATA, m.FlightAirline }).Distinct().ToList();
+
+                for (int i = 0; i < routes.Count; i++) // Loop through List with for)
+                {
+                    var FromAirportInfo = IATAAirports.Find(q => q.stop_id == routes[i].FromIATA);
+                    var ToAirportInfo = IATAAirports.Find(q => q.stop_id == routes[i].ToIATA);
+
+                    csvroutes.WriteField(routes[i].FromIATA + routes[i].ToIATA + "FC");
+                    csvroutes.WriteField("FC");
+                    csvroutes.WriteField(routes[i].FromIATA + routes[i].ToIATA);
+                    csvroutes.WriteField(FromAirportInfo.stop_name + " - " + ToAirportInfo.stop_name);
+                    csvroutes.WriteField(""); // routes[i].FlightAircraft + ";" + CIFLights[i].FlightAirline + ";" + CIFLights[i].FlightOperator + ";" + CIFLights[i].FlightCodeShare
+                    csvroutes.WriteField(1102);
+                    csvroutes.WriteField("");
+                    csvroutes.WriteField("");
+                    csvroutes.WriteField("");
+                    csvroutes.NextRecord();
+                }
+            }
+
+            // stops.txt
+
+            List<string> agencyairportsiata =
+             CIFLights.SelectMany(m => new string[] { m.FromIATA, m.ToIATA })
+                     .Distinct()
+                     .ToList();
+
+            using (var gtfsstops = new StreamWriter(@"gtfs\\stops.txt"))
+            {
+                // Route record
+                var csvstops = new CsvWriter(gtfsstops);
+                csvstops.Configuration.Delimiter = ",";
+                csvstops.Configuration.Encoding = Encoding.UTF8;
+                csvstops.Configuration.TrimFields = true;
+                // header                                 
+                csvstops.WriteField("stop_id");
+                csvstops.WriteField("stop_name");
+                csvstops.WriteField("stop_desc");
+                csvstops.WriteField("stop_lat");
+                csvstops.WriteField("stop_lon");
+                csvstops.WriteField("zone_id");
+                csvstops.WriteField("stop_url");
+                csvstops.NextRecord();
+
+                for (int i = 0; i < agencyairportsiata.Count; i++) // Loop through List with for)
+                {
+                    //int result1 = IATAAirports.FindIndex(T => T.stop_id == 9458)
+                    var airportinfo = IATAAirports.Find(q => q.stop_id == agencyairportsiata[i]);
+                    csvstops.WriteField(airportinfo.stop_id);
+                    csvstops.WriteField(airportinfo.stop_name);
+                    csvstops.WriteField(airportinfo.stop_desc);
+                    csvstops.WriteField(airportinfo.stop_lat);
+                    csvstops.WriteField(airportinfo.stop_lon);
+                    csvstops.WriteField(airportinfo.zone_id);
+                    csvstops.WriteField(airportinfo.stop_url);
+                    csvstops.NextRecord();
+                }
+            }
+
+
+            Console.WriteLine("Creating GTFS File trips.txt, stop_times.txt, calendar.txt ...");
+
+            using (var gtfscalendar = new StreamWriter(@"gtfs\\calendar.txt"))
+            {
+                using (var gtfstrips = new StreamWriter(@"gtfs\\trips.txt"))
+                {
+                    using (var gtfsstoptimes = new StreamWriter(@"gtfs\\stop_times.txt"))
+                    {
+                        // Headers 
+                        var csvstoptimes = new CsvWriter(gtfsstoptimes);
+                        csvstoptimes.Configuration.Delimiter = ",";
+                        csvstoptimes.Configuration.Encoding = Encoding.UTF8;
+                        csvstoptimes.Configuration.TrimFields = true;
+                        // header 
+                        csvstoptimes.WriteField("trip_id");
+                        csvstoptimes.WriteField("arrival_time");
+                        csvstoptimes.WriteField("departure_time");
+                        csvstoptimes.WriteField("stop_id");
+                        csvstoptimes.WriteField("stop_sequence");
+                        csvstoptimes.WriteField("stop_headsign");
+                        csvstoptimes.WriteField("pickup_type");
+                        csvstoptimes.WriteField("drop_off_type");
+                        csvstoptimes.WriteField("shape_dist_traveled");
+                        csvstoptimes.WriteField("timepoint");
+                        csvstoptimes.NextRecord();
+
+                        var csvtrips = new CsvWriter(gtfstrips);
+                        csvtrips.Configuration.Delimiter = ",";
+                        csvtrips.Configuration.Encoding = Encoding.UTF8;
+                        csvtrips.Configuration.TrimFields = true;
+                        // header 
+                        csvtrips.WriteField("route_id");
+                        csvtrips.WriteField("service_id");
+                        csvtrips.WriteField("trip_id");
+                        csvtrips.WriteField("trip_headsign");
+                        csvtrips.WriteField("trip_short_name");
+                        csvtrips.WriteField("direction_id");
+                        csvtrips.WriteField("block_id");
+                        csvtrips.WriteField("shape_id");
+                        csvtrips.WriteField("wheelchair_accessible");
+                        csvtrips.WriteField("bikes_allowed ");
+                        csvtrips.NextRecord();
+
+                        var csvcalendar = new CsvWriter(gtfscalendar);
+                        csvcalendar.Configuration.Delimiter = ",";
+                        csvcalendar.Configuration.Encoding = Encoding.UTF8;
+                        csvcalendar.Configuration.TrimFields = true;
+                        // header 
+                        csvcalendar.WriteField("service_id");
+                        csvcalendar.WriteField("monday");
+                        csvcalendar.WriteField("tuesday");
+                        csvcalendar.WriteField("wednesday");
+                        csvcalendar.WriteField("thursday");
+                        csvcalendar.WriteField("friday");
+                        csvcalendar.WriteField("saturday");
+                        csvcalendar.WriteField("sunday");
+                        csvcalendar.WriteField("start_date");
+                        csvcalendar.WriteField("end_date");
+                        csvcalendar.NextRecord();
+
+                        //1101 International Air Service
+                        //1102 Domestic Air Service
+                        //1103 Intercontinental Air Service
+                        //1104 Domestic Scheduled Air Service
+
+
+                        for (int i = 0; i < CIFLights.Count; i++) // Loop through List with for)
+                        {
+
+                            // Calender
+
+                            csvcalendar.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightMonday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightTuesday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightWednesday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightThursday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightFriday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightSaterday));
+                            csvcalendar.WriteField(Convert.ToInt32(CIFLights[i].FlightSunday));
+                            csvcalendar.WriteField(String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate));
+                            csvcalendar.WriteField(String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate));
+                            csvcalendar.NextRecord();
+
+                            // Trips
+
+                            //var item4 = _Airlines.Find(q => q.IATA == CIFLights[i].FlightAirline);
+                            //string TEMP_IATA = item4.IATA;
+
+                            var FromAirportInfo = IATAAirports.Find(q => q.stop_id == CIFLights[i].FromIATA);
+                            var ToAirportInfo = IATAAirports.Find(q => q.stop_id == CIFLights[i].ToIATA);
+
+                            csvtrips.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline);
+                            csvtrips.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                            csvtrips.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                            csvtrips.WriteField(ToAirportInfo.stop_name);
+                            csvtrips.WriteField(CIFLights[i].FlightNumber);
+                            csvtrips.WriteField("");
+                            csvtrips.WriteField("");
+                            csvtrips.WriteField("");
+                            csvtrips.WriteField("1");
+                            csvtrips.WriteField("");
+                            csvtrips.NextRecord();
+
+                            // Depart Record
+                            csvstoptimes.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                            csvstoptimes.WriteField(String.Format("{0:HH:mm:ss}", CIFLights[i].DepartTime));
+                            csvstoptimes.WriteField(String.Format("{0:HH:mm:ss}", CIFLights[i].DepartTime));
+                            csvstoptimes.WriteField(CIFLights[i].FromIATA);
+                            csvstoptimes.WriteField("0");
+                            csvstoptimes.WriteField("");
+                            csvstoptimes.WriteField("0");
+                            csvstoptimes.WriteField("0");
+                            csvstoptimes.WriteField("");
+                            csvstoptimes.WriteField("");
+                            csvstoptimes.NextRecord();
+                            // Arrival Record
+                            if (!CIFLights[i].FlightNextDayArrival)
+                            {
+                                csvstoptimes.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                                csvstoptimes.WriteField(String.Format("{0:HH:mm:ss}", CIFLights[i].ArrivalTime));
+                                csvstoptimes.WriteField(String.Format("{0:HH:mm:ss}", CIFLights[i].ArrivalTime));
+                                csvstoptimes.WriteField(CIFLights[i].ToIATA);
+                                csvstoptimes.WriteField("2");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.WriteField("0");
+                                csvstoptimes.WriteField("0");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.NextRecord();
+                            }
+                            else
+                            {
+                                //add 24 hour for the gtfs time
+                                int hour = CIFLights[i].ArrivalTime.Hour;
+                                hour = hour + 24;
+                                int minute = CIFLights[i].ArrivalTime.Minute;
+                                string strminute = minute.ToString();
+                                if (strminute.Length == 1) { strminute = "0" + strminute; }
+                                csvstoptimes.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
+                                csvstoptimes.WriteField(hour + ":" + strminute + ":00");
+                                csvstoptimes.WriteField(hour + ":" + strminute + ":00");
+                                csvstoptimes.WriteField(CIFLights[i].ToIATA);
+                                csvstoptimes.WriteField("2");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.WriteField("0");
+                                csvstoptimes.WriteField("0");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.WriteField("");
+                                csvstoptimes.NextRecord();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Create Zip File
+            string startPath = gtfsDir;
+            string zipPath = myDir + "\\VivaColombia.zip";
+            if (File.Exists(zipPath)) { File.Delete(zipPath); }
+            ZipFile.CreateFromDirectory(startPath, zipPath, CompressionLevel.Fastest, false);
         }
     }
 
@@ -174,9 +534,19 @@ namespace CI_VivaColombia
         public String FlightAirline;
         public String FlightOperator;
         public String FlightAircraft;
-        public String FlightDuration;
         public Boolean FlightCodeShare;
         public Boolean FlightNextDayArrival;
         public int FlightNextDays;
+    }
+
+    public class IATAAirport
+    {
+        public string stop_id;
+        public string stop_name;
+        public string stop_desc;
+        public string stop_lat;
+        public string stop_lon;
+        public string zone_id;
+        public string stop_url;
     }
 }
