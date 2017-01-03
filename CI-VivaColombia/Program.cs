@@ -368,6 +368,7 @@ namespace CI_VivaColombia
                 csvstops.WriteField("stop_lon");
                 csvstops.WriteField("zone_id");
                 csvstops.WriteField("stop_url");
+                csvstops.WriteField("stop_timezone");
                 csvstops.NextRecord();
 
                 for (int i = 0; i < agencyairportsiata.Count; i++) // Loop through List with for)
