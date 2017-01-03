@@ -20,7 +20,7 @@ namespace CI_VivaColombia
         public static readonly List<int> _AddDays = new List<int>() { 0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84 };
 
         static void Main(string[] args)
-        {                       
+        {
             string dataDir = AppDomain.CurrentDomain.BaseDirectory + "\\data";
             Directory.CreateDirectory(dataDir);
             string path = AppDomain.CurrentDomain.BaseDirectory + "data\\Luchthavens.html";
@@ -75,8 +75,14 @@ namespace CI_VivaColombia
                 wc.DownloadFile(url, path);
                 Console.WriteLine("Download ready...");
             }
-            StreamReader reader = new StreamReader(path);
-            string html = reader.ReadToEnd();
+            string html = string.Empty;
+            using (StreamReader reader = new StreamReader(path))
+            {
+                html = reader.ReadToEnd();
+            }
+
+            //StreamReader reader = new StreamReader(path);
+            //string html = reader.ReadToEnd();
             int start = html.IndexOf("airports: ") + 10;
             int end = html.IndexOf("internationalAirports:", start);
             string RouteJson = html.Substring(start, end - start);
@@ -90,7 +96,7 @@ namespace CI_VivaColombia
             dynamic dynJson = JsonConvert.DeserializeObject(RouteJson);
             foreach (var from in dynJson)
             {
-                Console.WriteLine("Parsing flights from: {0} - {1}", from.Name, from.Code);               
+                Console.WriteLine("Parsing flights from: {0} - {1}", from.Name, from.Code);
                 foreach (var to in from.Connections)
                 {
                     Console.WriteLine("Getting flight: {0} - {1}", from.Name, to.Name);
@@ -109,7 +115,7 @@ namespace CI_VivaColombia
                         var baseAddress = "https://www.vivacolombia.co/FlightSchedulePart/Search";
                         const string referersearch = "https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios";
                         //var request = (HttpWebRequest)WebRequest.Create("example.com");
-                        
+
                         var http = (HttpWebRequest)WebRequest.Create(new Uri(baseAddress));
                         http.Accept = "application/json";
                         http.ContentType = "application/json";
@@ -132,16 +138,16 @@ namespace CI_VivaColombia
                             using (JsonReader flightresponse = new JsonTextReader(sr))
                             {
                                 JsonSerializer serializer = new JsonSerializer();
-                                // Parse the Response.
-                                dynamic FlightResponseJson = serializer.Deserialize(flightresponse);
+                                    // Parse the Response.
+                                    dynamic FlightResponseJson = serializer.Deserialize(flightresponse);
                                 string FlightWeek = FlightResponseJson.OutboundHeader;
-                                // Cleaning TEMP variable
-                                TEMP_FromIATA = fromiata;
+                                    // Cleaning TEMP variable
+                                    TEMP_FromIATA = fromiata;
                                 TEMP_ToIATA = toiata;
 
 
-                                // Parsing To and From Date
-                                Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
+                                    // Parsing To and From Date
+                                    Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
                                 MatchCollection matches = rgxdate2.Matches(FlightWeek);
 
                                 string validfrom = matches[0].Value;
@@ -156,10 +162,10 @@ namespace CI_VivaColombia
                                     TEMP_FlightNumber = Schedules.FlightNumber;
                                     TEMP_DepartTime = Schedules.DepartureTime;
                                     TEMP_ArrivalTime = Schedules.ArrivalTime;
-                                    // No empty flightnumber flights.
-                                    if (TEMP_FlightNumber.Length != 0)
+                                        // No empty flightnumber flights.
+                                        if (TEMP_FlightNumber.Length != 0)
                                     {
-                                        
+
                                         TEMP_ValidFrom = ValidFrom;
                                         TEMP_ValidTo = ValidTo;
                                         if (Schedules.DepartureDate == Schedules.ArrivalDate)
@@ -172,8 +178,8 @@ namespace CI_VivaColombia
                                             TEMP_FlightNextDayArrival = true;
                                             TEMP_FlightNextDays = 1;
                                         }
-                                        // Query flight days
-                                        foreach (var Days in Schedules.AvailableDays)
+                                            // Query flight days
+                                            foreach (var Days in Schedules.AvailableDays)
                                         {
                                             int.TryParse(Days.ToString(), out TEMP_Conversie);
                                             if (TEMP_Conversie == 1) { TEMP_FlightMonday = true; }
@@ -185,29 +191,29 @@ namespace CI_VivaColombia
                                             if (TEMP_Conversie == 7) { TEMP_FlightSunday = true; }
                                         }
 
-                                        // check if flight fly
-                                        if (TEMP_FlightMonday | TEMP_FlightTuesday | TEMP_FlightWednesday | TEMP_FlightThursday | TEMP_FlightFriday | TEMP_FlightSaterday | TEMP_FlightSunday)
-                                        {                                            
-                                            // Add Flight to CIFlights
-                                            bool alreadyExists = CIFLights.Exists(x => x.FromIATA == TEMP_FromIATA
-                                            && x.ToIATA == TEMP_ToIATA
-                                            && x.FromDate == TEMP_ValidFrom
-                                            && x.ToDate == TEMP_ValidTo
-                                            && x.FlightNumber == TEMP_FlightNumber
-                                            && x.FlightAirline == "FC"
-                                            && x.FlightMonday == TEMP_FlightMonday
-                                            && x.FlightTuesday == TEMP_FlightTuesday
-                                            && x.FlightWednesday == TEMP_FlightWednesday
-                                            && x.FlightThursday == TEMP_FlightThursday
-                                            && x.FlightFriday == TEMP_FlightFriday
-                                            && x.FlightSaterday == TEMP_FlightSaterday
-                                            && x.FlightSunday == TEMP_FlightSunday);
+                                            // check if flight fly
+                                            if (TEMP_FlightMonday | TEMP_FlightTuesday | TEMP_FlightWednesday | TEMP_FlightThursday | TEMP_FlightFriday | TEMP_FlightSaterday | TEMP_FlightSunday)
+                                        {
+                                                // Add Flight to CIFlights
+                                                bool alreadyExists = CIFLights.Exists(x => x.FromIATA == TEMP_FromIATA
+                                                    && x.ToIATA == TEMP_ToIATA
+                                                    && x.FromDate == TEMP_ValidFrom
+                                                    && x.ToDate == TEMP_ValidTo
+                                                    && x.FlightNumber == TEMP_FlightNumber
+                                                    && x.FlightAirline == "FC"
+                                                    && x.FlightMonday == TEMP_FlightMonday
+                                                    && x.FlightTuesday == TEMP_FlightTuesday
+                                                    && x.FlightWednesday == TEMP_FlightWednesday
+                                                    && x.FlightThursday == TEMP_FlightThursday
+                                                    && x.FlightFriday == TEMP_FlightFriday
+                                                    && x.FlightSaterday == TEMP_FlightSaterday
+                                                    && x.FlightSunday == TEMP_FlightSunday);
 
 
                                             if (!alreadyExists)
                                             {
-                                                // don't add flights that already exists
-                                                CIFLights.Add(new CIFLight
+                                                    // don't add flights that already exists
+                                                    CIFLights.Add(new CIFLight
                                                 {
                                                     FromIATA = TEMP_FromIATA,
                                                     ToIATA = TEMP_ToIATA,
@@ -233,8 +239,8 @@ namespace CI_VivaColombia
                                             }
                                         }
                                     }
-                                    // Cleaning All but From and To and Valid from and Valid To                        
-                                    TEMP_Conversie = 0;
+                                        // Cleaning All but From and To and Valid from and Valid To                        
+                                        TEMP_Conversie = 0;
                                     TEMP_FlightMonday = false;
                                     TEMP_FlightTuesday = false;
                                     TEMP_FlightWednesday = false;
@@ -250,17 +256,17 @@ namespace CI_VivaColombia
                                     TEMP_FlightNextDayArrival = false;
                                     TEMP_FlightNextDays = 0;
                                 }
-                                // End Week parsing.
-                            }
+                                    // End Week parsing.
+                                }
                         }
-                        
+
 
 
 
 
                     });
                     //End Parsing Flights
-                }                
+                }
                 // End Parsing Routes
             }
             // Export XML
@@ -547,7 +553,8 @@ namespace CI_VivaColombia
                             csvstoptimes.WriteField("");
                             csvstoptimes.NextRecord();
                             // Arrival Record
-                            if (!CIFLights[i].FlightNextDayArrival)
+                            //if (!CIFLights[i].FlightNextDayArrival)
+                            if (CIFLights[i].DepartTime.TimeOfDay < TimeSpan.Parse("23:59:59") & CIFLights[i].ArrivalTime.TimeOfDay < TimeSpan.Parse("00:00:00"))
                             {
                                 csvstoptimes.WriteField(CIFLights[i].FromIATA + CIFLights[i].ToIATA + CIFLights[i].FlightAirline + CIFLights[i].FlightNumber.Replace(" ", "") + String.Format("{0:yyyyMMdd}", CIFLights[i].FromDate) + String.Format("{0:yyyyMMdd}", CIFLights[i].ToDate) + Convert.ToInt32(CIFLights[i].FlightMonday) + Convert.ToInt32(CIFLights[i].FlightTuesday) + Convert.ToInt32(CIFLights[i].FlightWednesday) + Convert.ToInt32(CIFLights[i].FlightThursday) + Convert.ToInt32(CIFLights[i].FlightFriday) + Convert.ToInt32(CIFLights[i].FlightSaterday) + Convert.ToInt32(CIFLights[i].FlightSunday));
                                 csvstoptimes.WriteField(String.Format("{0:HH:mm:ss}", CIFLights[i].ArrivalTime));
