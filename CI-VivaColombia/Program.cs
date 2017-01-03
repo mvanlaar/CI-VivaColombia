@@ -17,7 +17,7 @@ namespace CI_VivaColombia
 {
     class Program
     {
-        public static readonly List<int> _AddDays = new List<int>() { 0,7,14,21,28,35,42,49,56,63,70,77,84 };
+        public static readonly List<int> _AddDays = new List<int>() { 0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84 };
 
         static void Main(string[] args)
         {                       
@@ -59,8 +59,8 @@ namespace CI_VivaColombia
             DateTime TEMP_DepartTime = new DateTime();
             DateTime TEMP_ArrivalTime = new DateTime();
             Boolean TEMP_FlightCodeShare = false;
-            string TEMP_FlightNumber = null;
-            string TEMP_Aircraftcode = null;            
+            string TEMP_FlightNumber = String.Empty;
+            string TEMP_Aircraftcode = String.Empty;
             Boolean TEMP_FlightNextDayArrival = false;
             int TEMP_FlightNextDays = 0;
             List<CIFLight> CIFLights = new List<CIFLight> { };
@@ -124,99 +124,117 @@ namespace CI_VivaColombia
                         newStream.Close();
                         var response = http.GetResponse();
                         var stream = response.GetResponseStream();
-                        var sr = new StreamReader(stream);
-                        var flightresponse = sr.ReadToEnd();
-
-                        // Parse the Response.
-                        dynamic FlightResponseJson = JsonConvert.DeserializeObject(flightresponse);
-                        string FlightWeek = FlightResponseJson.OutboundHeader;
-                        // Cleaning TEMP variable
-                        TEMP_FromIATA = fromiata;
-                        TEMP_ToIATA = toiata;
-
-
-                        // Parsing To and From Date
-                        Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
-                        MatchCollection matches = rgxdate2.Matches(FlightWeek);
-
-                        string validfrom = matches[0].Value;
-                        string validto = matches[1].Value;
-
-                        DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM yyyy", dtfi);
-                        DateTime ValidTo = DateTime.ParseExact(validto, "d MMM yyyy", dtfi);
-
-
-                        foreach (var Schedules in FlightResponseJson.OutboundSchedules)
+                        using (StreamReader sr = new StreamReader(stream))
+                        using (JsonReader flightresponse = new JsonTextReader(sr))
                         {
-                            TEMP_FlightNumber = Schedules.FlightNumber;
-                            TEMP_DepartTime = Schedules.DepartureTime;
-                            TEMP_ArrivalTime = Schedules.ArrivalTime;
-                            TEMP_ValidFrom = ValidFrom;
-                            TEMP_ValidTo = ValidTo;
-                            if (Schedules.DepartureDate == Schedules.ArrivalDate)
+                            JsonSerializer serializer = new JsonSerializer();
+                            // Parse the Response.
+                            dynamic FlightResponseJson = serializer.Deserialize(flightresponse);
+                            string FlightWeek = FlightResponseJson.OutboundHeader;
+                            // Cleaning TEMP variable
+                            TEMP_FromIATA = fromiata;
+                            TEMP_ToIATA = toiata;
+
+
+                            // Parsing To and From Date
+                            Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
+                            MatchCollection matches = rgxdate2.Matches(FlightWeek);
+
+                            string validfrom = matches[0].Value;
+                            string validto = matches[1].Value;
+
+                            DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM yyyy", dtfi);
+                            DateTime ValidTo = DateTime.ParseExact(validto, "d MMM yyyy", dtfi);
+
+
+                            foreach (var Schedules in FlightResponseJson.OutboundSchedules)
                             {
-                                TEMP_FlightNextDayArrival = false;
-                                TEMP_FlightNextDays = 0;
+                                TEMP_FlightNumber = Schedules.FlightNumber;
+                                TEMP_DepartTime = Schedules.DepartureTime;
+                                TEMP_ArrivalTime = Schedules.ArrivalTime;
+
+                                if (TEMP_FlightNumber.Length != 0)
+                                {
+
+                                    TEMP_ValidFrom = ValidFrom;
+                                    TEMP_ValidTo = ValidTo;
+                                    if (Schedules.DepartureDate == Schedules.ArrivalDate)
+                                    {
+                                        TEMP_FlightNextDayArrival = false;
+                                        TEMP_FlightNextDays = 0;
+                                    }
+                                    else
+                                    {
+                                        TEMP_FlightNextDayArrival = true;
+                                        TEMP_FlightNextDays = 1;
+                                    }
+                                    // Query flight days
+                                    foreach (var Days in Schedules.AvailableDays)
+                                    {
+                                        int.TryParse(Days.ToString(), out TEMP_Conversie);
+                                        if (TEMP_Conversie == 1) { TEMP_FlightMonday = true; }
+                                        if (TEMP_Conversie == 2) { TEMP_FlightTuesday = true; }
+                                        if (TEMP_Conversie == 3) { TEMP_FlightWednesday = true; }
+                                        if (TEMP_Conversie == 4) { TEMP_FlightThursday = true; }
+                                        if (TEMP_Conversie == 5) { TEMP_FlightFriday = true; }
+                                        if (TEMP_Conversie == 6) { TEMP_FlightSaterday = true; }
+                                        if (TEMP_Conversie == 7) { TEMP_FlightSunday = true; }
+                                    }
+
+                                    //TEMP_FlightNumber = TEMP_FlightNumber.Trim();
+
+
+                                    // No empty flightnumber flights.
+                                    // Add Flight to CIFlights
+                                    CIFLights.Add(new CIFLight
+                                    {
+                                        FromIATA = TEMP_FromIATA,
+                                        ToIATA = TEMP_ToIATA,
+                                        FromDate = TEMP_ValidFrom,
+                                        ToDate = TEMP_ValidTo,
+                                        ArrivalTime = TEMP_ArrivalTime,
+                                        DepartTime = TEMP_DepartTime,
+                                        FlightAircraft = "A320",
+                                        FlightAirline = "FC",
+                                        FlightMonday = TEMP_FlightMonday,
+                                        FlightTuesday = TEMP_FlightTuesday,
+                                        FlightWednesday = TEMP_FlightWednesday,
+                                        FlightThursday = TEMP_FlightThursday,
+                                        FlightFriday = TEMP_FlightFriday,
+                                        FlightSaterday = TEMP_FlightSaterday,
+                                        FlightSunday = TEMP_FlightSunday,
+                                        FlightNumber = TEMP_FlightNumber,
+                                        FlightOperator = null,
+                                        FlightCodeShare = TEMP_FlightCodeShare,
+                                        FlightNextDayArrival = TEMP_FlightNextDayArrival,
+                                        FlightNextDays = TEMP_FlightNextDays
+                                    });
+
+
+                                    // Cleaning All but From and To and Valid from and Valid To                        
+                                    TEMP_Conversie = 0;
+                                    TEMP_FlightMonday = false;
+                                    TEMP_FlightTuesday = false;
+                                    TEMP_FlightWednesday = false;
+                                    TEMP_FlightThursday = false;
+                                    TEMP_FlightFriday = false;
+                                    TEMP_FlightSaterday = false;
+                                    TEMP_FlightSunday = false;
+                                    TEMP_DepartTime = new DateTime();
+                                    TEMP_ArrivalTime = new DateTime();
+                                    TEMP_FlightNumber = String.Empty;
+                                    TEMP_Aircraftcode = String.Empty;
+                                    TEMP_FlightCodeShare = false;
+                                    TEMP_FlightNextDayArrival = false;
+                                    TEMP_FlightNextDays = 0;
+                                }
                             }
-                            else
-                            {
-                                TEMP_FlightNextDayArrival = true;
-                                TEMP_FlightNextDays = 1;
-                            }
-                            // Query flight days
-                            foreach (var Days in Schedules.AvailableDays)
-                            {
-                                int.TryParse(Days.ToString(), out TEMP_Conversie);
-                                if (TEMP_Conversie == 1) { TEMP_FlightMonday = true; }
-                                if (TEMP_Conversie == 2) { TEMP_FlightTuesday = true; }
-                                if (TEMP_Conversie == 3) { TEMP_FlightWednesday = true; }
-                                if (TEMP_Conversie == 4) { TEMP_FlightThursday = true; }
-                                if (TEMP_Conversie == 5) { TEMP_FlightFriday = true; }
-                                if (TEMP_Conversie == 6) { TEMP_FlightSaterday = true; }
-                                if (TEMP_Conversie == 7) { TEMP_FlightSunday = true; }
-                            }
-                            // Add Flight to CIFlights
-                            CIFLights.Add(new CIFLight
-                            {
-                                FromIATA = TEMP_FromIATA,
-                                ToIATA = TEMP_ToIATA,
-                                FromDate = TEMP_ValidFrom,
-                                ToDate = TEMP_ValidTo,
-                                ArrivalTime = TEMP_ArrivalTime,
-                                DepartTime = TEMP_DepartTime,
-                                FlightAircraft = "A320",
-                                FlightAirline = "FC",
-                                FlightMonday = TEMP_FlightMonday,
-                                FlightTuesday = TEMP_FlightTuesday,
-                                FlightWednesday = TEMP_FlightWednesday,
-                                FlightThursday = TEMP_FlightThursday,
-                                FlightFriday = TEMP_FlightFriday,
-                                FlightSaterday = TEMP_FlightSaterday,
-                                FlightSunday = TEMP_FlightSunday,
-                                FlightNumber = TEMP_FlightNumber,
-                                FlightOperator = null,
-                                FlightCodeShare = TEMP_FlightCodeShare,
-                                FlightNextDayArrival = TEMP_FlightNextDayArrival,
-                                FlightNextDays = TEMP_FlightNextDays
-                            });
-                            // Cleaning All but From and To and Valid from and Valid To                        
-                            TEMP_Conversie = 0;
-                            TEMP_FlightMonday = false;
-                            TEMP_FlightTuesday = false;
-                            TEMP_FlightWednesday = false;
-                            TEMP_FlightThursday = false;
-                            TEMP_FlightFriday = false;
-                            TEMP_FlightSaterday = false;
-                            TEMP_FlightSunday = false;
-                            TEMP_DepartTime = new DateTime();
-                            TEMP_ArrivalTime = new DateTime();
-                            TEMP_FlightNumber = null;
-                            TEMP_Aircraftcode = null;
-                            TEMP_FlightCodeShare = false;
-                            TEMP_FlightNextDayArrival = false;
-                            TEMP_FlightNextDays = 0;
+                            // End Week parsing.
                         }
-                        // End Week parsing.
+
+
+
+
                     });
                     //End Parsing Flights
                 }                
