@@ -118,7 +118,6 @@ namespace CI_VivaColombia
                         string parsedContent = JsonConvert.SerializeObject(flight);
                         ASCIIEncoding encoding = new ASCIIEncoding();
                         Byte[] bytes = encoding.GetBytes(parsedContent);
-
                         Stream newStream = http.GetRequestStream();
                         newStream.Write(bytes, 0, bytes.Length);
                         newStream.Close();
@@ -182,33 +181,54 @@ namespace CI_VivaColombia
                                     }
 
                                     //TEMP_FlightNumber = TEMP_FlightNumber.Trim();
-
-
+                                    
                                     // No empty flightnumber flights.
                                     // Add Flight to CIFlights
-                                    CIFLights.Add(new CIFLight
+                                    bool alreadyExists = CIFLights.Exists(x => x.FromIATA == TEMP_FromIATA
+                                    && x.ToIATA == TEMP_ToIATA
+                                    && x.FromDate == TEMP_ValidFrom
+                                    && x.ToDate == TEMP_ValidTo
+                                    && x.FlightNumber == TEMP_FlightNumber
+                                    && x.FlightAirline == "FC"
+                                    && x.FlightMonday == TEMP_FlightMonday
+                                    && x.FlightTuesday == TEMP_FlightTuesday
+                                    && x.FlightWednesday == TEMP_FlightWednesday
+                                    && x.FlightThursday == TEMP_FlightThursday
+                                    && x.FlightFriday == TEMP_FlightFriday
+                                    && x.FlightSaterday == TEMP_FlightSaterday
+                                    && x.FlightSunday == TEMP_FlightSunday);
+
+
+                                    if (alreadyExists)
                                     {
-                                        FromIATA = TEMP_FromIATA,
-                                        ToIATA = TEMP_ToIATA,
-                                        FromDate = TEMP_ValidFrom,
-                                        ToDate = TEMP_ValidTo,
-                                        ArrivalTime = TEMP_ArrivalTime,
-                                        DepartTime = TEMP_DepartTime,
-                                        FlightAircraft = "A320",
-                                        FlightAirline = "FC",
-                                        FlightMonday = TEMP_FlightMonday,
-                                        FlightTuesday = TEMP_FlightTuesday,
-                                        FlightWednesday = TEMP_FlightWednesday,
-                                        FlightThursday = TEMP_FlightThursday,
-                                        FlightFriday = TEMP_FlightFriday,
-                                        FlightSaterday = TEMP_FlightSaterday,
-                                        FlightSunday = TEMP_FlightSunday,
-                                        FlightNumber = TEMP_FlightNumber,
-                                        FlightOperator = null,
-                                        FlightCodeShare = TEMP_FlightCodeShare,
-                                        FlightNextDayArrival = TEMP_FlightNextDayArrival,
-                                        FlightNextDays = TEMP_FlightNextDays
-                                    });
+                                        Console.WriteLine("Flight Already found...");
+                                    }
+                                    else
+                                    {
+                                        CIFLights.Add(new CIFLight
+                                        {
+                                            FromIATA = TEMP_FromIATA,
+                                            ToIATA = TEMP_ToIATA,
+                                            FromDate = TEMP_ValidFrom,
+                                            ToDate = TEMP_ValidTo,
+                                            ArrivalTime = TEMP_ArrivalTime,
+                                            DepartTime = TEMP_DepartTime,
+                                            FlightAircraft = "A320",
+                                            FlightAirline = "FC",
+                                            FlightMonday = TEMP_FlightMonday,
+                                            FlightTuesday = TEMP_FlightTuesday,
+                                            FlightWednesday = TEMP_FlightWednesday,
+                                            FlightThursday = TEMP_FlightThursday,
+                                            FlightFriday = TEMP_FlightFriday,
+                                            FlightSaterday = TEMP_FlightSaterday,
+                                            FlightSunday = TEMP_FlightSunday,
+                                            FlightNumber = TEMP_FlightNumber,
+                                            FlightOperator = null,
+                                            FlightCodeShare = TEMP_FlightCodeShare,
+                                            FlightNextDayArrival = TEMP_FlightNextDayArrival,
+                                            FlightNextDays = TEMP_FlightNextDays
+                                        });
+                                    }
 
 
                                     // Cleaning All but From and To and Valid from and Valid To                        
