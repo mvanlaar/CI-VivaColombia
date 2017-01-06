@@ -93,6 +93,21 @@ namespace CI_VivaColombia
             // Remove last , from the string
             RouteJson = RouteJson.Remove(RouteJson.Length - 1);
             // Parse the JSON reponse.
+
+            // International Airports
+            int startint = html.IndexOf("internationalAirports: ") + 23;
+            int endint = html.IndexOf("departureDate:", start);
+            string IntStations = html.Substring(startint, endint - startint);
+            // Remove Newline
+            IntStations = IntStations.TrimEnd(System.Environment.NewLine.ToCharArray());
+            // Trim the string
+            IntStations = IntStations.Trim();
+            // Remove last , from the string
+            IntStations = IntStations.Remove(IntStations.Length - 1);
+            // Parse the JSON reponse.
+            // Parse International Stations
+            dynamic InstationsParsed = JsonConvert.DeserializeObject(IntStations);
+
             dynamic dynJson = JsonConvert.DeserializeObject(RouteJson);
             foreach (var from in dynJson)
             {
@@ -348,6 +363,13 @@ namespace CI_VivaColombia
                 {
                     string FromAirportName = null;
                     string ToAirportName = null;
+                    int routetype = 1101;
+                    if (InstationsParsed.Contains(routes[i].FromIATA) | InstationsParsed.Contains(routes[i].ToIATA))
+                    {
+                        routetype = 1102;
+                    }
+
+
                     using (var client = new WebClient())
                     {
                         client.Encoding = Encoding.UTF8;
@@ -370,7 +392,7 @@ namespace CI_VivaColombia
                     csvroutes.WriteField(routes[i].FromIATA + routes[i].ToIATA);
                     csvroutes.WriteField(FromAirportName + " - " + ToAirportName);
                     csvroutes.WriteField(""); // routes[i].FlightAircraft + ";" + CIFLights[i].FlightAirline + ";" + CIFLights[i].FlightOperator + ";" + CIFLights[i].FlightCodeShare
-                    csvroutes.WriteField(1102);
+                    csvroutes.WriteField(routetype);
                     csvroutes.WriteField("");
                     csvroutes.WriteField("");
                     csvroutes.WriteField("");
