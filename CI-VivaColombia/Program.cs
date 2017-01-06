@@ -363,12 +363,10 @@ namespace CI_VivaColombia
                 {
                     string FromAirportName = null;
                     string ToAirportName = null;
-                    int routetype = 1101;
-                    if (InstationsParsed.Contains(routes[i].FromIATA) | InstationsParsed.Contains(routes[i].ToIATA))
-                    {
-                        routetype = 1102;
-                    }
-
+                    string FromAirportCountry = null;
+                    string FromAirportContinent = null;
+                    string ToAirportCountry = null;
+                    string ToAirportContinent = null;
 
                     using (var client = new WebClient())
                     {
@@ -377,6 +375,8 @@ namespace CI_VivaColombia
                         var jsonapi = client.DownloadString(urlapi);
                         dynamic AirportResponseJson = JsonConvert.DeserializeObject(jsonapi);
                         FromAirportName = Convert.ToString(AirportResponseJson[0].name);
+                        FromAirportCountry = Convert.ToString(AirportResponseJson[0].country_code);
+                        FromAirportContinent = Convert.ToString(AirportResponseJson[0].continent);
                     }
                     using (var client = new WebClient())
                     {
@@ -385,6 +385,8 @@ namespace CI_VivaColombia
                         var jsonapi = client.DownloadString(urlapi);
                         dynamic AirportResponseJson = JsonConvert.DeserializeObject(jsonapi);
                         ToAirportName = Convert.ToString(AirportResponseJson[0].name);
+                        ToAirportCountry = Convert.ToString(AirportResponseJson[0].country_code);
+                        ToAirportContinent = Convert.ToString(AirportResponseJson[0].continent);
                     }
 
                     csvroutes.WriteField(routes[i].FromIATA + routes[i].ToIATA + routes[i].FlightAirline);
@@ -392,7 +394,24 @@ namespace CI_VivaColombia
                     csvroutes.WriteField(routes[i].FromIATA + routes[i].ToIATA);
                     csvroutes.WriteField(FromAirportName + " - " + ToAirportName);
                     csvroutes.WriteField(""); // routes[i].FlightAircraft + ";" + CIFLights[i].FlightAirline + ";" + CIFLights[i].FlightOperator + ";" + CIFLights[i].FlightCodeShare
-                    csvroutes.WriteField(routetype);
+                    if (FromAirportCountry == ToAirportCountry)
+                    {
+                        // Colombian internal flight domestic
+                        csvroutes.WriteField(1102);
+                    }
+                    else
+                    {
+                        if (FromAirportContinent == ToAirportContinent)
+                        {
+                            // International Flight
+                            csvroutes.WriteField(1101);
+                        }
+                        else
+                        {
+                            // Intercontinental Flight
+                            csvroutes.WriteField(1103);
+                        }
+                    }
                     csvroutes.WriteField("");
                     csvroutes.WriteField("");
                     csvroutes.WriteField("");
