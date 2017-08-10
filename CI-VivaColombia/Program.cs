@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CI_VivaColombia
@@ -28,7 +29,9 @@ namespace CI_VivaColombia
             const string ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)";
             const string referer = "https://www.vivacolombia.co/";
             CultureInfo ci = new CultureInfo("es-CO");
+            CultureInfo export = new CultureInfo("en-US");
             DateTimeFormatInfo dtfi = ci.DateTimeFormat;
+            
 
             string APIPathAirport = "airport/iata/";
             string APIPathAirline = "airline/iata/";
@@ -288,6 +291,10 @@ namespace CI_VivaColombia
                 }
                 // End Parsing Routes
             }
+
+            Thread.CurrentThread.CurrentCulture = export;
+            Thread.CurrentThread.CurrentUICulture = export;
+
             // Export XML
             // Write the list of objects to a file.
             System.Xml.Serialization.XmlSerializer writer =
@@ -457,7 +464,7 @@ namespace CI_VivaColombia
 
                         csvstops.WriteField(Convert.ToString(AirportResponseJson[0].code));
                         csvstops.WriteField(Convert.ToString(AirportResponseJson[0].name));
-                        csvstops.WriteField("");
+                        csvstops.WriteField(Convert.ToString(AirportResponseJson[0].city));
                         csvstops.WriteField(Convert.ToString(AirportResponseJson[0].lat));
                         csvstops.WriteField(Convert.ToString(AirportResponseJson[0].lng));
                         csvstops.WriteField("");
