@@ -178,6 +178,7 @@ namespace CI_VivaColombia
                                 foreach (var Schedules in FlightResponseJson.OutboundSchedules)
                                 {
                                     TEMP_FlightNumber = Schedules.FlightNumber;
+                                    TEMP_FlightNumber = TEMP_FlightNumber.Replace(" ", "");
                                     TEMP_DepartTime = Schedules.DepartureTime;
                                     TEMP_ArrivalTime = Schedules.ArrivalTime;
                                     // No empty flightnumber flights.
