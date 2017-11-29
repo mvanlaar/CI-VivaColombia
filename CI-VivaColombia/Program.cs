@@ -121,8 +121,8 @@ namespace CI_VivaColombia
 
                     string fromiata = from.Code.ToString();
                     string toiata = to.Code.ToString();
-
-                    Parallel.ForEach(_AddDays, new ParallelOptions { MaxDegreeOfParallelism = 13 }, (Day) =>
+                    foreach (var Day in _AddDays)
+                    //   Parallel.ForEach(_AddDays, new ParallelOptions { MaxDegreeOfParallelism = 13 }, (Day) =>
                     {
                         DateTime dt = DateTime.Now;
                         dt = dt.AddDays(Day);
@@ -166,14 +166,14 @@ namespace CI_VivaColombia
                                 TEMP_ToIATA = toiata;
 
                                 // Parsing To and From Date
-                                Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
+                                Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic). ([0-9]{4})");
                                 MatchCollection matches = rgxdate2.Matches(FlightWeek);
 
                                 string validfrom = matches[0].Value;
                                 string validto = matches[1].Value;
 
-                                DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM yyyy", dtfi);
-                                DateTime ValidTo = DateTime.ParseExact(validto, "d MMM yyyy", dtfi);
+                                DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM. yyyy", dtfi);
+                                DateTime ValidTo = DateTime.ParseExact(validto, "d MMM. yyyy", dtfi);
 
                                 foreach (var Schedules in FlightResponseJson.OutboundSchedules)
                                 {
@@ -282,12 +282,8 @@ namespace CI_VivaColombia
                                 // End Week parsing.
                             }
                         }
-
-
-
-
-
-                    });
+                    // End loop parrallel
+                    }//);
                     //End Parsing Flights
                 }
                 // End Parsing Routes
