@@ -87,7 +87,7 @@ namespace CI_VivaColombia
             //StreamReader reader = new StreamReader(path);
             //string html = reader.ReadToEnd();
             int start = html.IndexOf("airports: ") + 10;
-            int end = html.IndexOf("internationalAirports:", start);
+            int end = html.IndexOf("currencies:", start);
             string RouteJson = html.Substring(start, end - start);
             // Remove Newline
             RouteJson = RouteJson.TrimEnd(System.Environment.NewLine.ToCharArray());
