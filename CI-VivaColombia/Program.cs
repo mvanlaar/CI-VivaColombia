@@ -25,9 +25,9 @@ namespace CI_VivaColombia
             string dataDir = AppDomain.CurrentDomain.BaseDirectory + "\\data";
             Directory.CreateDirectory(dataDir);
             string path = AppDomain.CurrentDomain.BaseDirectory + "data\\Luchthavens.html";
-            Uri url = new Uri("https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios");
+            Uri url = new Uri("https://vivaair.com/co/viaja-con-viva-air/informacion/itinerarios");
             const string ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)";
-            const string referer = "https://www.vivacolombia.co/";
+            const string referer = "https://vivaair.com/";
             CultureInfo ci = new CultureInfo("es-CO");
             CultureInfo export = new CultureInfo("en-US");
             DateTimeFormatInfo dtfi = ci.DateTimeFormat;
@@ -130,8 +130,8 @@ namespace CI_VivaColombia
                         // Clean TEMP Variables
                         TEMP_ValidFrom = new DateTime();
                         TEMP_ValidTo = new DateTime();
-                        var baseAddress = "https://www.vivacolombia.co/FlightSchedulePart/Search";
-                        const string referersearch = "https://www.vivacolombia.co/co/viaja-con-vivacolombia/informacion/itinerarios";
+                        var baseAddress = "https://vivaair.com/FlightSchedulePart/Search";
+                        const string referersearch = "https://vivaair.com/co/viaja-con-viva-air/informacion/itinerarios";
                         //var request = (HttpWebRequest)WebRequest.Create("example.com");
 
                         var http = (HttpWebRequest)WebRequest.Create(new Uri(baseAddress));
@@ -166,14 +166,14 @@ namespace CI_VivaColombia
                                 TEMP_ToIATA = toiata;
 
                                 // Parsing To and From Date
-                                Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic). ([0-9]{4})");
+                                Regex rgxdate2 = new Regex(@"(([0-9])|([0-2][0-9])|([3][0-1])) (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) ([0-9]{4})");
                                 MatchCollection matches = rgxdate2.Matches(FlightWeek);
 
                                 string validfrom = matches[0].Value;
                                 string validto = matches[1].Value;
 
-                                DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM. yyyy", dtfi);
-                                DateTime ValidTo = DateTime.ParseExact(validto, "d MMM. yyyy", dtfi);
+                                DateTime ValidFrom = DateTime.ParseExact(validfrom, "d MMM yyyy", dtfi);
+                                DateTime ValidTo = DateTime.ParseExact(validto, "d MMM yyyy", dtfi);
 
                                 foreach (var Schedules in FlightResponseJson.OutboundSchedules)
                                 {
